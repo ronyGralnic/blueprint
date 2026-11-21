@@ -1,0 +1,11 @@
+feat(blueprint): set up Blueprint site and add item 2026-11-14-24
+
+- engine: home gallery with search and filters, about page, data-driven item page (works over http and file://)
+- kit v2: RTL Hebrew typography, light/dark, term popovers, bridges, OG template, local fonts
+- item 2026-11-14-24 "Noon sun, evening truck": surplus solar -> battery-swap stations for heavy trucks
+  interactive estimates, scroll-built architecture (zooms per step on mobile), 24h charging chart,
+  10x slider, trade-offs, interviewer Q&A
+- Design Doc in Hebrew and English (DOCX + PDF)
+- tools: build_item, og, build_docs (+docx_build.js), check (1280/390 x light/dark x http/file)
+
+Source: The Economist, 2026-11-14, China, "COphew"

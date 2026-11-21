@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blueprint · תכנון מערכות מתוך החדשות</title>
+<meta name="description" content="כל פריט לוקח סיפור חדשותי והופך אותו לשאלת System Design בנוסח ראיון: דרישות, חישוב גס, API, ארכיטקטורה שנבנית בגלילה, ומה נשבר כשמגדילים פי 10.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Blueprint · תכנון מערכות מתוך החדשות">
+<meta property="og:description" content="סיפור חדשותי אחד, שאלת System Design אחת, משרטטים עד הסוף.">
+<meta property="og:image" content="assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("desk-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){document.documentElement.dataset.theme="light"}</script>
+<link rel="stylesheet" href="kit/kit.css">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip" href="#main">דילוג לתוכן</a>
+<header class="site-head"><div class="wrap">
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="27" height="27" rx="3"/><path d="M2.5 22.5h27M22.5 22.5v7"/><path d="M7 18 7 7h11z"/><circle cx="21" cy="12" r="3.2"/><path d="M21 15.2v3M7 13.5h4.5"/></svg>Blueprint <small>SYSTEM DESIGN</small></a>
+  <nav class="site-nav"><a href="index.html#items">פריטים</a><a href="about.html">אודות</a><button class="theme-btn" type="button" aria-label="מצב תצוגה">☾</button></nav>
+</div></header>
+
+<main id="main" class="wrap">
+  <section class="hero">
+    <div class="kicker">SHEET 00 · INDEX</div>
+    <h1>תכנון מערכות מתוך החדשות</h1>
+    <p class="lede">כל פריט לוקח סיפור אחד מהחדשות ושואל עליו את השאלה של ראיון System Design: אם היית צריך לבנות את המערכת שמאחורי הסיפור, איך היית בונה אותה? מתחילים מדרישות ומספרים, משרטטים רכיב אחרי רכיב, ובודקים מה נשבר ראשון כשמגדילים פי 10.</p>
+  </section>
+
+  <section aria-labelledby="howto-h">
+    <h2 id="howto-h" class="sr-only">איך לקרוא</h2>
+    <div class="howto">
+      <div class="card"><b>01 · השאלה</b>הסיפור מתורגם לשאלה אחת בנוסח ראיון: "תכנן מערכת ש...". קודם מבהירים מה בפנים ומה בחוץ.</div>
+      <div class="card"><b>02 · המספרים</b>חישוב גס עם מחוונים. כל מספר מסומן: מהדיווח, הנחה שלנו, או חישוב. שנו הנחה וראו מה זז.</div>
+      <div class="card"><b>03 · השרטוט</b>הדיאגרמה נבנית בזמן הגלילה. כל רכיב נכנס עם נימוק: למה הוא כאן, ומה היה קורה בלעדיו.</div>
+      <div class="card"><b>04 · הלחץ</b>מחוון "פי 10" מראה מה נשבר ראשון. אחריו פשרות, ושאלות ההמשך שמראיין היה שואל.</div>
+    </div>
+  </section>
+
+  <section id="items" class="sec" aria-labelledby="items-h">
+    <div class="sec-head"><span class="sec-num">∑</span><h2 id="items-h">פריטים</h2></div>
+    <div class="filters" role="group" aria-label="סינון">
+      <input type="search" id="q" placeholder="חיפוש: מדינה, תחום, רכיב..." aria-label="חיפוש פריטים">
+      <div id="chips" class="filters" style="margin:0"></div>
+    </div>
+    <div id="gallery" class="gallery" aria-live="polite"></div>
+  </section>
+</main>
+
+<footer class="site-foot"><div class="wrap">Blueprint הוא חלק מ-Desk. ניתוחים לימודיים שמבוססים על דיווחים ב-The Economist, בכתיבה ובשרטוט מקוריים. <a href="about.html">אודות</a></div></footer>
+
+<script src="items/data.js"></script>
+<script src="kit/kit.js"></script>
+<script src="assets/home.js"></script>
+</body>
+</html>

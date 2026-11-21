@@ -1,0 +1,312 @@
+{
+ "title": "Noon sun, evening truck",
+ "subtitle": "A system design exercise drawn from China's falling emissions: a platform that routes surplus solar power into battery-swap stations for heavy trucks",
+ "status": "Draft · design exercise",
+ "tldr": "A platform that ingests telemetry from generation sites, the grid and battery-swap stations, forecasts clean-power surplus per grid region, and schedules charging of the stations' battery inventory so it draws on that surplus while every reserved truck still gets a full battery. Reservations are strongly consistent per station; stations keep working when disconnected. The back-of-envelope numbers show the real load is telemetry and scheduling, not the API.",
+ "context": [
+  "According to CREA, a Finnish think-tank, China's CO₂ emissions fell 3.1% year on year in the third quarter, the fastest drop since the 2022 lockdowns, and this time alongside modest growth.",
+  "China emits nearly a third of the world's CO₂, so small changes move the global trend: 3.1% of its emissions equals all of Britain's.",
+  "Some causes are temporary (pricier coal after a mine-safety crackdown, oil prices raised by the Iran war, mild weather). Others are structural: the property bust cut steel and cement demand, coal supplied under half of power in the first half for the first time, and China installed 1,000GW of solar since 2022, more than the rest of the world combined, plus 300GW+ of wind.",
+  "Transport is electrifying: two-thirds of September car sales and half of heavy-truck sales were electric. CATL has built hundreds of stations where trucks swap batteries in minutes.",
+  "Headwinds: solar installations fell by more than half, generators now sell at market prices, legacy contracts favour coal, and the grid wastes clean power it can neither store nor move. Local governments, remembering the 2022 blackouts, keep building coal plants just in case."
+ ],
+ "goals": [
+  "Raise the share of battery charging that comes from clean-power surplus.",
+  "Guarantee a full battery for every reserved truck, with no double allocation.",
+  "Keep working when a station is cut off from the cloud.",
+  "Measure surplus absorbed, CO₂ avoided and driver wait times."
+ ],
+ "nongoals": [
+  "Directly controlling power plants or transmission lines; the system consumes grid signals.",
+  "Billing and payments (an existing billing system is assumed).",
+  "Navigation and route planning; the system only suggests stations on a given route.",
+  "Long-term grid planning.",
+  "Passenger cars; heavy trucks with standard swappable batteries only."
+ ],
+ "functional": [
+  "Ingest telemetry from generation sites, the grid and stations: power, prices, per-battery state of charge.",
+  "Forecast surplus per grid region for the next 24 hours at 15-minute resolution.",
+  "A charging plan per station, refreshed every 5 minutes from forecast, price and reservations.",
+  "Station search along a route with predicted battery availability at the truck's ETA.",
+  "Swap reservations: hold a specific battery, cancel, complete.",
+  "Reporting: curtailment avoided, CO₂ avoided, driver wait times."
+ ],
+ "nonfunctional": [
+  "Never two trucks on one battery: strong consistency for reservations, per station.",
+  "Swaps work without the cloud: a disconnected station runs for hours on its last plan.",
+  "99.95% availability for the driver API; P99 under 300 ms for search and reserve.",
+  "Telemetry: ~400k points/s at defaults, burst-tolerant, zero loss.",
+  "Plans on time: nationwide solve within a 5-minute window.",
+  "Grid data stays in-country."
+ ],
+ "inputs": {
+  "trucks": "Electric trucks on the platform",
+  "swaps": "Swaps per truck per day",
+  "kwh": "Battery capacity",
+  "stations": "Swap stations",
+  "batt": "Batteries in stock per station",
+  "sites": "Reporting generation sites",
+  "metrics": "Metrics per site",
+  "interval": "Reporting interval",
+  "peak": "Peak-to-average ratio",
+  "calls": "API calls per swap"
+ },
+ "srcKinds": {
+  "report": "reported",
+  "assume": "assumption",
+  "calc": "calculation"
+ },
+ "outputs": {
+  "swapsDay": [
+   "Swaps per day",
+   "trucks × swaps per truck"
+  ],
+  "qps": [
+   "Peak API requests per second",
+   "swaps/day × calls ÷ 86,400 × peak ratio"
+  ],
+  "pts": [
+   "Telemetry points per second",
+   "(sites × metrics + stations × batteries × 8) ÷ interval"
+  ],
+  "bw": [
+   "Inbound bandwidth",
+   "~60 bytes per point on the wire × 8 bits"
+  ],
+  "day": [
+   "Storage per day, compressed",
+   "points/s × 86,400 × 2 bytes"
+  ],
+  "year": [
+   "Storage per year",
+   "daily × 365, before downsampling"
+  ],
+  "pool": [
+   "Energy stored in battery inventory",
+   "stations × batteries × kWh"
+  ],
+  "energy": [
+   "Energy the fleet uses per day",
+   "swaps × kWh × 0.8; for scale, one hour of 1,000GW at full output is 1,000GWh"
+  ]
+ },
+ "estNote": "At default values the driver API is small (tens of requests per second) while telemetry is huge (hundreds of thousands of points per second), so effort goes into the data pipeline and scheduling. And the whole fleet uses tens of GWh a day, against 1,000GWh in a single full-sun hour of 1,000GW: swap stations alone cannot fix curtailment; they are one flexible load among several.",
+ "apiIntro": "External API for drivers and fleets, internal API between components. Idempotency is central: a driver with poor reception will press twice.",
+ "endpoints": [
+  "Stations along the route with predicted full batteries at ETA. May be seconds stale (eventual consistency).",
+  "Reserve: holds a specific battery until a deadline. Requires an Idempotency-Key so a double tap creates one reservation.",
+  "Cancel. The battery returns to stock immediately; the next planning round picks it up.",
+  "Station reports a completed swap: battery out, battery in, energy delivered.",
+  "Edge gateways send compressed batches every few seconds. Backpressure: if the log is busy, the gateway buffers locally and retries.",
+  "Forecast surplus and price per 15-minute slot, with the forecast version.",
+  "Scheduler pushes a plan: kW per 15-minute slot and how many batteries must be ready each hour. Stations ignore stale plan_version."
+ ],
+ "modelNotes": {
+  "batteries": "The station is the source of truth for physical state; the cloud is the source of truth for holds.",
+  "telemetry": "30 days on fast disk, then 1-minute averages on cheap storage."
+ },
+ "archIntro": "Components in the order they were added, with the reason each one exists.",
+ "steps": [
+  [
+   "Sources: generation and grid",
+   "Solar and wind farms report output every few seconds; the grid operator adds prices, loads and line limits. At midday in sunny regions output exceeds what the grid can absorb or move.",
+   "Without seeing surplus in real time there is nothing to schedule."
+  ],
+  [
+   "Edge gateways",
+   "An on-site gateway collects, compresses and batches readings, and buffers locally when the link drops.",
+   "Hundreds of thousands of points per second cannot hit servers directly; gateways cut connections by orders of magnitude and absorb outages."
+  ],
+  [
+   "Event log",
+   "All readings land in an ordered log partitioned by grid region; each consumer reads at its own pace.",
+   "Decouples writers from readers: if the database is slow, nothing is lost, it waits in the log."
+  ],
+  [
+   "Stream processing and time-series DB",
+   "Stream processing computes current surplus per region every minute; the TSDB keeps every reading for analysis and training.",
+   "Two different questions: 'what is happening now' needs seconds; 'what happened last month' needs cheap storage and range queries."
+  ],
+  [
+   "Forecast service",
+   "Combines weather forecasts with history to predict surplus per region for each 15-minute slot of the next 24 hours.",
+   "Planning must start before the surplus arrives."
+  ],
+  [
+   "Signals and price",
+   "The forecast becomes a simple versioned signal per region: expected surplus and price per slot.",
+   "Separates the model from its consumers, so models can change and new flexible loads such as data centres can subscribe."
+  ],
+  [
+   "Swap stations",
+   "Each station holds a battery inventory; its local controller reports state of charge and executes the charging plan.",
+   "The station is both a flexible load and the place where service happens; it must keep working offline."
+  ],
+  [
+   "Reservations and inventory",
+   "Drivers search through the API gateway; the reservation service holds a specific battery in a strongly consistent database that syncs with the station.",
+   "The one place the system must never be wrong: a double allocation strands a driver."
+  ],
+  [
+   "Charge scheduler",
+   "Every 5 minutes it takes the signals and expected demand (reservations plus predicted arrivals) and computes kW per slot for every station.",
+   "The heart of the system: charge as much as possible from surplus while keeping enough batteries ready every hour."
+  ],
+  [
+   "Analytics",
+   "Reservation changes stream (CDC) into an analytics store alongside the telemetry archive; reports on surplus absorbed and CO₂ avoided come from there.",
+   "Without measurement there is no way to know whether the system does what it was built for."
+  ]
+ ],
+ "dives": [
+  {
+   "title": "Reservations without double booking, even when the link drops",
+   "problem": "Two trucks race for a station's last battery; a driver taps twice on a bad connection; a station is offline for an hour. In every case each battery may be held for at most one truck.",
+   "design": [
+    "The database is sharded by station_id, so all holds for a station live in one shard and can be locked without cross-server coordination.",
+    "A reservation is one transaction: pick a ready battery, mark it held, insert the reservation. Of two competing requests only one gets the battery.",
+    "A unique Idempotency-Key makes retries return the same answer.",
+    "Every hold has a TTL; a background job releases batteries whose truck missed hold_until."
+   ],
+   "decisions": [
+    "**Local quota per station.** The cloud pre-assigns part of each station's stock to walk-ins; an offline station serves walk-ins only from that quota and never touches held batteries.",
+    "On reconnect the station uploads a log and the cloud reconciles; rare conflicts move the reservation to a nearby station and notify the driver.",
+    "A reservation for later holds a battery that will be ready at ETA per the charging plan, so the plan must honour holds (ready_targets).",
+    "Search locks nothing: it reads predicted availability from a replica and may be seconds stale. Only the reservation is consistent."
+   ],
+   "codeTitle": "The reservation as a single transaction (SQL, Postgres)"
+  },
+  {
+   "title": "When to charge: chase the surplus without stranding a driver",
+   "problem": "Surplus peaks at midday; trucks arrive all day, mostly in the evening. Charge only on surplus and evening stock may run out; charge on return and the surplus is missed. In the illustrative day modelled on the item page, charge-on-arrival absorbs about 6% of the surplus, surplus-aware scheduling about 44%, and adding other flexible loads about 93%.",
+   "design": [
+    "Rolling horizon: every 5 minutes re-plan the next 24 hours, execute only the next 15 minutes.",
+    "Objective: maximise energy charged from surplus and minimise cost. Constraints: station grid connection, per-battery charge rate, and batteries that must be ready each hour (reservations, predicted arrivals, safety margin).",
+    "Solved as a linear program per grid region; regions are nearly independent, so they solve in parallel.",
+    "Plans are versioned; stations execute only the newest."
+   ],
+   "decisions": [
+    "**Variable safety margin.** When the forecast is uncertain (cloud cover), keep more batteries ready and give up some surplus: forecast uncertainty becomes reserve batteries.",
+    "**Graceful fallback.** If a solve is late, stations keep the previous plan; with no plan at all the local controller follows a simple rule: charge when price is below a threshold, always keep a minimum ready.",
+    "Lesson from the report: part of the waste is that the grid cannot move surplus, not only store it, so the signal is per grid region, not national."
+   ],
+   "codeTitle": "Local fallback rule (pseudocode, station controller)"
+  }
+ ],
+ "x10": [
+  [
+   "Charge scheduler (solve time)",
+   "A regional solve no longer finishes within the 5-minute window: variables grow with stations and batteries, and solve time grows faster still. Stations run on stale plans.",
+   "Hierarchical decomposition (split surplus across sub-regions first, then solve each in parallel) plus warm starts from the previous solution."
+  ],
+  [
+   "Event log (writes)",
+   "Busy regional partitions hit their write ceiling; gateways start buffering and forecasts see late data.",
+   "More partitions per region, and edge compression: 5-second averages plus full-resolution exceptions."
+  ],
+  [
+   "Time-series DB (writes)",
+   "Write rate exceeds what nodes can compress and store; forecast queries slow down.",
+   "Partition by region and time, automatic downsampling after 7 days, cold storage on cheap disk."
+  ],
+  [
+   "Reservations DB (hot stations)",
+   "Corridor stations get many times the average; their reservations hit one shard and locks queue (hot partition).",
+   "In-memory stock counter and a reservation queue per hot station; split large stations into several shards by bay."
+  ],
+  [
+   "API gateway",
+   "Reaches its ceiling.",
+   "More instances behind a load balancer; stateless and easiest to scale."
+  ]
+ ],
+ "x10Note": "The surprise: the first thing to break is neither the database nor the API but the scheduler's solve time, because it grows faster than the load. Ask not only how much load, but how fast each component grows with it. Baseline utilisations are illustrative assumptions.",
+ "trades": [
+  [
+   "Consistency",
+   "Availability",
+   "Consistent reservations, available search",
+   "A double booking costs a stranded driver; a search result ten seconds stale costs nothing. The CAP choice is made per operation, not per system."
+  ],
+  [
+   "Data freshness",
+   "Cost",
+   "Report every 5 s, aggregate at the edge",
+   "1-second reporting would multiply telemetry by five for a forecast at 15-minute resolution."
+  ],
+  [
+   "Optimal plan",
+   "Plan on time",
+   "Good enough, every 5 minutes",
+   "A perfect plan that arrives late is worse than a decent one on time."
+  ],
+  [
+   "Central control",
+   "Station autonomy",
+   "Cloud plans, station decides at the moment of truth",
+   "Stations keep running offline with a local quota and fallback rule; plans are less optimal without a link."
+  ],
+  [
+   "Absorb maximum surplus",
+   "Batteries ready for drivers",
+   "Service first",
+   "A driver who waited an hour will go back to diesel. Better to give up some surplus than lose trust, much as the officials in the report build coal just in case."
+  ]
+ ],
+ "risks": [
+  "**Wrong forecast on a cloudy day:** variable safety margin and local fallback.",
+  "**Conflicts after a disconnect:** separate local quotas, log-based reconciliation, transfer to a nearby station.",
+  "**Incentives:** if market prices don't reflect surplus (legacy contracts), the signal misleads the scheduler; it needs a source that doesn't depend on price alone.",
+  "**Scope:** stations alone absorb only part of the surplus; a general flexible-load interface is needed from day one."
+ ],
+ "open": [
+  "Who owns the local quota at a station shared by several operators?",
+  "Should avoided CO₂ use average or marginal grid carbon intensity?",
+  "Should drivers see price at reservation time, or only availability?"
+ ],
+ "qa": [
+  [
+   "A station loses its cloud link for three hours. What happens?",
+   "It runs its last 24-hour plan, then the local rule; existing reservations are already on site and walk-ins draw only on the local quota. In the cloud, search marks the station uncertain and stops taking new reservations there. On reconnect the station uploads its log and the cloud reconciles."
+  ],
+  [
+   "How do you know the forecast is good enough?",
+   "Measure forecast error per region and horizon against a naive baseline ('tomorrow like today'), feed uncertainty into the safety margin, and above all measure outcomes: surplus actually absorbed and how often a driver found no battery."
+  ],
+  [
+   "How do you measure success?",
+   "Three competing metrics: GWh of surplus absorbed per month; driver P95 wait and no-battery rate; CO₂ avoided using the carbon intensity of the hour charged. Any single metric pushes the system to an extreme."
+  ],
+  [
+   "Now add data centres. What changes?",
+   "Almost nothing if the signal is right: a data centre is another flexible load with its own limits. Define a generic interface (what can move, when, at what price) and the scheduler treats stations and data centres alike. The report notes the government already steers data centres west, towards sun and wind."
+  ],
+  [
+   "Two reservations for the same battery arrive in the same millisecond. Walk me through it.",
+   "Both reach the same shard (station_id). Both select with FOR UPDATE SKIP LOCKED: the first locks the row, the second skips to the next battery. If none is left, the second gets 409 with the next station suggested. Same Idempotency-Key means the second simply returns the first reservation."
+  ]
+ ],
+ "takes": [
+  [
+   "Technology",
+   "The bottleneck for clean energy has moved from panels to coordination: storing, moving and timing power is as much a software problem as a hardware one."
+  ],
+  [
+   "Technology",
+   "A swap station is storage that comes free with transport, but the estimate shows it is far too small to fix curtailment alone. It is one flexible load among several."
+  ],
+  [
+   "People",
+   "Trust comes before efficiency. Officials who remember the 2022 blackouts build coal just in case; a driver who once waited an hour returns to diesel."
+  ],
+  [
+   "Craft",
+   "Start from the physical constraint, then the numbers, then the boxes. Here the estimate reordered every priority."
+  ],
+  [
+   "Craft",
+   "Incentives are part of the architecture: market pricing and coal-friendly legacy contracts shape system behaviour as much as any component."
+  ]
+ ],
+ "source": "Based on reporting in The Economist, 14 November 2026 (China section, \"COphew\"). The system described is a design exercise, not an existing system of CATL or of China's grid operators."
+}

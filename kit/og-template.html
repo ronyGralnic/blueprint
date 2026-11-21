@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- Desk kit v2 — Open Graph card template (1200×630). tools/og.py fills the {{…}} slots
+     and the site's --og-* variables, then screenshots it with headless Chrome. -->
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="kit.css">
+<style>
+  html,body{margin:0;width:1200px;height:630px;overflow:hidden}
+  body{background:var(--og-bg,#0d1b36);color:var(--og-ink,#eaf1ff);font-family:var(--f-body);position:relative}
+  .bg{position:absolute;inset:0;background-image:var(--og-pattern,none)}
+  .frame{position:absolute;inset:36px;border:2px solid var(--og-line,rgba(255,255,255,.35));border-radius:6px;padding:48px 56px;display:flex;flex-direction:column}
+  .site{font-family:var(--f-mono);letter-spacing:.18em;font-size:22px;color:var(--og-accent,#8fc1ff);direction:ltr;text-align:right}
+  h1{font-family:var(--f-head);font-size:{{TITLE_SIZE}}px;line-height:1.15;margin:28px 0 18px;color:var(--og-ink,#fff)}
+  p{font-size:28px;line-height:1.45;margin:0;color:var(--og-muted,#b9c7e4);max-width:980px}
+  .foot{margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;font-family:var(--f-mono);font-size:20px;color:var(--og-muted,#b9c7e4)}
+  .metric{font-family:var(--f-body);text-align:left}
+  .metric b{display:block;font-family:var(--f-mono);font-size:44px;color:var(--og-accent,#8fc1ff);font-weight:500}
+  {{EXTRA_CSS}}
+</style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="frame">
+    <div class="site">{{SITE}}</div>
+    <h1>{{TITLE}}</h1>
+    <p>{{SUBTITLE}}</p>
+    <div class="foot"><span dir="ltr">{{FOOTER}}</span><span class="metric"><b dir="ltr">{{METRIC}}</b>{{METRIC_LABEL}}</span></div>
+  </div>
+</body>
+</html>

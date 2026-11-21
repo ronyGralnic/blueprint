@@ -1,0 +1,8 @@
+interview/
+tools/_shots/
+tools/node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+kit/_og_tmp.html
+items/*/docs/_*
